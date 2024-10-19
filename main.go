@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"image/jpeg"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -9,46 +10,63 @@ import (
 
 	helpers "github.com/bibauporto/photosOrganizer/helpers"
 	processors "github.com/bibauporto/photosOrganizer/processors"
-	goexiv "github.com/kolesa-team/goexiv"
+
+	"github.com/rwcarlsen/goexif/exif"
 )
-
-// Check if the date is valid
-func isValidDate(year, month, day int) bool {
-	return year >= 1970 && year <= 2050 && month >= 1 && month <= 12 && day >= 1 && day <= 31
-}
-
 
 // Set EXIF DateTimeOriginal in a JPEG file
 func setExifDateTaken(filePath, dateTime string) error {
-	image, err := goexiv.Open(filePath)
+	imgFile, err := os.Open(filePath)
 	if err != nil {
 		return fmt.Errorf("error opening image: %v", err)
 	}
-	defer image.Close()
+	defer imgFile.Close()
 
-	// Set the EXIF DateTimeOriginal
-	if err := image.SetExif("Exif.Image.DateTimeOriginal", dateTime); err != nil {
-		return fmt.Errorf("error setting EXIF DateTimeOriginal: %v", err)
+	// Decode the image
+	img, err := jpeg.Decode(imgFile)
+	if err != nil {
+		return fmt.Errorf("error decoding image: %v", err)
 	}
 
-	return image.Write()
-}
+	// Create a new EXIF data structure
+	x := exif.New()
+	x.Set("Exif.Image.DateTimeOriginal", dateTime)
 
+	// Save the new EXIF data
+	outFile, err := os.Create(filePath)
+	if err != nil {
+		return fmt.Errorf("error creating output file: %v", err)
+	}
+	defer outFile.Close()
+
+	// Write the image with new EXIF data
+	if err := jpeg.Encode(outFile, img, nil); err != nil {
+		return fmt.Errorf("error encoding image: %v", err)
+	}
+
+	return nil
+}
 // Get EXIF DateTimeOriginal
 func getExifDateTaken(filePath string) (string, error) {
-	image, err := goexiv.Open(filePath)
+	imgFile, err := os.Open(filePath)
 	if err != nil {
 		return "", fmt.Errorf("error opening image: %v", err)
 	}
-	defer image.Close()
+	defer imgFile.Close()
 
-	// Get DateTimeOriginal
-	val, err := image.GetExif("Exif.Image.DateTimeOriginal")
+	// Read EXIF data
+	exifData, err := exif.Decode(imgFile)
 	if err != nil {
 		return "", nil
 	}
 
-	return val, nil
+	// Get DateTimeOriginal
+	val, err := exifData.Get(exif.DateTimeOriginal)
+	if err != nil {
+		return "", nil
+	}
+
+	return val.String(), nil
 }
 
 // Process Image Files
@@ -75,7 +93,7 @@ func processImage(file, folderPath string) error {
 	minute := matchOrDefault(match[5], "00")
 	second := matchOrDefault(match[6], "00")
 
-	if !isValidDate(year, month, day) {
+	if !helpers.IsValidDate(year, month, day) {
 		fmt.Printf("Invalid date in filename: %s\n", file)
 		return nil
 	}
@@ -131,10 +149,6 @@ func processFiles(folderPath string) error {
 	}
 	return nil
 }
-
-
-
-
 
 // Helper function to check if a slice contains a string
 func contains(slice []string, item string) bool {

@@ -24,3 +24,9 @@ func GenerateUniqueFileName(folderPath, baseName, ext string) (string, error) {
 	}
 	return uniqueName, nil
 }
+
+
+// Check if the date is valid
+func IsValidDate(year, month, day int) bool {
+	return year >= 1970 && year <= 2050 && month >= 1 && month <= 12 && day >= 1 && day <= 31
+}
