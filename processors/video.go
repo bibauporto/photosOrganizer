@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	helpers "github.com/bibauporto/photosOrganizer/helpers"
+	"github.com/bibauporto/photosOrganizer/helpers"
 )
 
 func ProcessVideo(file, folderPath string) error {
