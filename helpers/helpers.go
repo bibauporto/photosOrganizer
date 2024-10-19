@@ -30,3 +30,22 @@ func GenerateUniqueFileName(folderPath, baseName, ext string) (string, error) {
 func IsValidDate(year, month, day int) bool {
 	return year >= 1970 && year <= 2050 && month >= 1 && month <= 12 && day >= 1 && day <= 31
 }
+
+
+// Helper function to check if a slice contains a string
+func Contains(slice []string, item string) bool {
+	for _, value := range slice {
+		if value == item {
+			return true
+		}
+	}
+	return false
+}
+
+// Match or provide a default value
+func MatchOrDefault(value string, defaultValue string) string {
+	if value == "" {
+		return defaultValue
+	}
+	return value
+}
