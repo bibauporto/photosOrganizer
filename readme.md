@@ -44,7 +44,7 @@ YYYY-MM-DD HH.MM.SS.ext
 To install the tool, clone the repository and build the project using Go.
 
 ```bash
-git clone https://github.com/your-username/photosOrganizer.git
+git clone https://github.com/bibauporto/photosOrganizer.git
 cd photosOrganizer
 go build
 ```
