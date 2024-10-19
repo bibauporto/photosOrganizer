@@ -9,12 +9,24 @@ import (
 )
 
 func ProcessVideo(file, folderPath string) error {
+
+	//check if name is already in the correct format
+	if helpers.CorrectNameRegex.MatchString(file) {
+		fmt.Printf("Skipping already named video: %s\n", file)
+		return nil
+	}
+
+
+
+
 	// try to parse the name of the file
 	match := helpers.DateParserRegex.FindStringSubmatch(file)
 	if match == nil {
 		fmt.Printf("No date in filename: %s\n", file)
 		return nil
-	} else {
+	} 
+
+
 		// use modified date of the file to set the name of the file
 		filePath := filepath.Join(folderPath, file)
 		fileInfo, err := os.Stat(filePath)
@@ -39,6 +51,5 @@ func ProcessVideo(file, folderPath string) error {
 			return err
 		}
 
-	}
 	return nil
 }

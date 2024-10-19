@@ -2,63 +2,51 @@ package exif
 
 import (
 	"fmt"
-	"image/jpeg"
 	"os"
+	"time"
 
 	"github.com/rwcarlsen/goexif/exif"
 )
 
-// Set EXIF DateTimeOriginal in a JPEG file
-func SetExifDateTaken(filePath, dateTime string) error {
-	imgFile, err := os.Open(filePath)
-	if err != nil {
-		return fmt.Errorf("error opening image: %v", err)
-	}
-	defer imgFile.Close()
-
-	// Decode the image
-	img, err := jpeg.Decode(imgFile)
-	if err != nil {
-		return fmt.Errorf("error decoding image: %v", err)
-	}
-
-	// Create a new EXIF data structure
-	x := exif.New()
-	x.Set("Exif.Image.DateTimeOriginal", dateTime)
-
-	// Save the new EXIF data
-	outFile, err := os.Create(filePath)
-	if err != nil {
-		return fmt.Errorf("error creating output file: %v", err)
-	}
-	defer outFile.Close()
-
-	// Write the image with new EXIF data
-	if err := jpeg.Encode(outFile, img, nil); err != nil {
-		return fmt.Errorf("error encoding image: %v", err)
-	}
-
-	return nil
+// openImageFile opens an image file and returns the file handle.
+func openImageFile(filePath string) (*os.File, error) {
+    imgFile, err := os.Open(filePath)
+    if err != nil {
+        return nil, fmt.Errorf("error opening image: %v", err)
+    }
+    return imgFile, nil
 }
-// Get EXIF DateTimeOriginal
-func GetExifDateTaken(filePath string) (string, error) {
-	imgFile, err := os.Open(filePath)
-	if err != nil {
-		return "", fmt.Errorf("error opening image: %v", err)
-	}
-	defer imgFile.Close()
 
-	// Read EXIF data
-	exifData, err := exif.Decode(imgFile)
-	if err != nil {
-		return "", nil
-	}
+// decodeExifData decodes EXIF data from an image file.
+func decodeExifData(imgFile *os.File) (*exif.Exif, error) {
+    exifData, err := exif.Decode(imgFile)
+    if err != nil {
+        return nil, fmt.Errorf("error decoding EXIF data: %v", err)
+    }
 
-	// Get DateTimeOriginal
-	val, err := exifData.Get(exif.DateTimeOriginal)
-	if err != nil {
-		return "", nil
-	}
+    return exifData, nil
+}
 
-	return val.String(), nil
+
+// GetExifDateTaken gets the EXIF DateTimeOriginal from a JPEG file.
+func GetExifDateTaken(filePath string) (time.Time, error) {
+    imgFile, err := openImageFile(filePath)
+    if err != nil {
+        return time.Time{}, err
+    }
+    defer imgFile.Close()
+
+    // Read EXIF data
+    exifData, err := decodeExifData(imgFile)
+    if err != nil {
+        return time.Time{}, err
+    }
+
+    // Get DateTimeOriginal
+    val, err := exifData.DateTime()
+    if err != nil {
+        return time.Time{}, fmt.Errorf("error getting DateTimeOriginal: %v", err)
+    }
+
+    return val, nil
 }
