@@ -4,37 +4,19 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strconv"
 	"strings"
 
-	"github.com/kolesa-team/goexiv"
+	helpers "github.com/bibauporto/photosOrganizer/helpers"
+	processors "github.com/bibauporto/photosOrganizer/processors"
+	goexiv "github.com/kolesa-team/goexiv"
 )
-
-// Supported file extensions
-var IMAGE_EXTENSIONS = []string{".jpg", ".jpeg", ".heic"}
-var VIDEO_EXTENSIONS = []string{".mp4", ".mov"}
-
-var dateRegex = regexp.MustCompile(`(\d{4})[._-]?(\d{2})[._-]?(\d{2})(?:[._-]?(\d{2}))?(?:[._-]?(\d{2}))?(?:[._-]?(\d{2}))?`)
 
 // Check if the date is valid
 func isValidDate(year, month, day int) bool {
 	return year >= 1970 && year <= 2050 && month >= 1 && month <= 12 && day >= 1 && day <= 31
 }
 
-// Generate a unique file name
-func generateUniqueFileName(folderPath, baseName, ext string) (string, error) {
-	uniqueName := baseName
-	counter := 1
-	for {
-		if _, err := os.Stat(filepath.Join(folderPath, uniqueName+ext)); os.IsNotExist(err) {
-			break
-		}
-		uniqueName = fmt.Sprintf("%s_%d", baseName, counter)
-		counter++
-	}
-	return uniqueName, nil
-}
 
 // Set EXIF DateTimeOriginal in a JPEG file
 func setExifDateTaken(filePath, dateTime string) error {
@@ -80,7 +62,7 @@ func processImage(file, folderPath string) error {
 		return nil
 	}
 
-	match := dateRegex.FindStringSubmatch(file)
+	match := helpers.DateParserRegex.FindStringSubmatch(file)
 	if match == nil {
 		fmt.Printf("No date in filename: %s\n", file)
 		return nil
@@ -99,7 +81,7 @@ func processImage(file, folderPath string) error {
 	}
 
 	baseName := fmt.Sprintf("%04d-%02d-%02d %02s.%02s.%02s", year, month, day, hour, minute, second)
-	newFileName, err := generateUniqueFileName(folderPath, baseName, ext)
+	newFileName, err := helpers.GenerateUniqueFileName(folderPath, baseName, ext)
 	if err != nil {
 		return err
 	}
@@ -135,12 +117,12 @@ func processFiles(folderPath string) error {
 
 	for _, file := range files {
 		ext := strings.ToLower(filepath.Ext(file.Name()))
-		if contains(IMAGE_EXTENSIONS, ext) {
+		if contains(helpers.IMAGE_EXTENSIONS, ext) {
 			if err := processImage(file.Name(), folderPath); err != nil {
 				return err
 			}
-		} else if contains(VIDEO_EXTENSIONS, ext) {
-			if err := processVideo(file.Name(), folderPath); err != nil {
+		} else if contains(helpers.VIDEO_EXTENSIONS, ext) {
+			if err := processors.ProcessVideo(file.Name(), folderPath); err != nil {
 				return err
 			}
 		} else {
@@ -150,41 +132,6 @@ func processFiles(folderPath string) error {
 	return nil
 }
 
-
-func processVideo(file, folderPath string) error {
-	// try to parse the name of the file
-	match := dateRegex.FindStringSubmatch(file)
-	if match == nil {
-		fmt.Printf("No date in filename: %s\n", file)
-		return nil
-	} else {
-		// use modified date of the file to set the name of the file
-		filePath := filepath.Join(folderPath, file)
-		fileInfo, err := os.Stat(filePath)
-		if err != nil {
-			return err
-		}
-		year := fileInfo.ModTime().Year()
-		month := int(fileInfo.ModTime().Month())
-		day := fileInfo.ModTime().Day()
-		hour := fileInfo.ModTime().Hour()
-		minute := fileInfo.ModTime().Minute()
-		second := fileInfo.ModTime().Second()
-
-		baseName := fmt.Sprintf("%04d-%02d-%02d %02d.%02d.%02d", year, month, day, hour, minute, second)
-		newFileName, err := generateUniqueFileName(folderPath, baseName, filepath.Ext(file))
-		if err != nil {
-			return err
-		}
-
-		newFilePath := filepath.Join(folderPath, newFileName+filepath.Ext(file))
-		if err := os.Rename(filePath, newFilePath); err != nil {
-			return err
-		}
-
-	}
-
-	
 
 
 
