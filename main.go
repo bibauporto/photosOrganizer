@@ -14,33 +14,30 @@ import (
 func processFiles(folderPath string) error {
 	files, err := os.ReadDir(folderPath)
 	if err != nil {
-		return fmt.Errorf("error reading directory: %v", err)
+		return fmt.Errorf("error reading directory %s: %w", folderPath, err)
 	}
 
-	// Process subfolders first
 	for _, file := range files {
 		filePath := filepath.Join(folderPath, file.Name())
+
 		if file.IsDir() {
 			// Recursively process subfolders
 			if err := processFiles(filePath); err != nil {
-				return err
+				return fmt.Errorf("error processing folder %s: %w", filePath, err)
 			}
-		}
-	}
-
-	// Process files in the current folder after handling subfolders
-	for _, file := range files {
-		if !file.IsDir() {
+		} else {
+			// Process files based on extension
 			ext := strings.ToLower(filepath.Ext(file.Name()))
-			if helpers.Contains(helpers.IMAGE_EXTENSIONS, ext) {
+			switch {
+			case helpers.Contains(helpers.IMAGE_EXTENSIONS, ext):
 				if err := processors.ProcessImage(file.Name(), folderPath); err != nil {
-					return err
+					return fmt.Errorf("error processing image %s: %w", file.Name(), err)
 				}
-			} else if helpers.Contains(helpers.VIDEO_EXTENSIONS, ext) {
+			case helpers.Contains(helpers.VIDEO_EXTENSIONS, ext):
 				if err := processors.ProcessVideo(file.Name(), folderPath); err != nil {
-					return err
+					return fmt.Errorf("error processing video %s: %w", file.Name(), err)
 				}
-			} else {
+			default:
 				fmt.Printf("Skipping unsupported file type: %s\n", file.Name())
 			}
 		}
