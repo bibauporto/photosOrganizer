@@ -1,18 +1,14 @@
 package main
 
-
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
-	"time"
-	
-	helpers "github.com/bibauporto/photosOrganizer/helpers"
-	"github.com/rwcarlsen/goexif/exif"
+
+	"github.com/kolesa-team/goexiv"
 )
 
 // Supported file extensions
@@ -21,12 +17,12 @@ var VIDEO_EXTENSIONS = []string{".mp4", ".mov"}
 
 var dateRegex = regexp.MustCompile(`(\d{4})[._-]?(\d{2})[._-]?(\d{2})(?:[._-]?(\d{2}))?(?:[._-]?(\d{2}))?(?:[._-]?(\d{2}))?`)
 
-// Helper function to check if the date is valid
+// Check if the date is valid
 func isValidDate(year, month, day int) bool {
 	return year >= 1970 && year <= 2050 && month >= 1 && month <= 12 && day >= 1 && day <= 31
 }
 
-// Generate a unique file name if a file with the same name already exists
+// Generate a unique file name
 func generateUniqueFileName(folderPath, baseName, ext string) (string, error) {
 	uniqueName := baseName
 	counter := 1
@@ -42,28 +38,35 @@ func generateUniqueFileName(folderPath, baseName, ext string) (string, error) {
 
 // Set EXIF DateTimeOriginal in a JPEG file
 func setExifDateTaken(filePath, dateTime string) error {
-	file, err := os.Open(filePath)
+	image, err := goexiv.Open(filePath)
 	if err != nil {
-		return fmt.Errorf("error opening file: %v", err)
+		return fmt.Errorf("error opening image: %v", err)
 	}
-	defer file.Close()
-
-	exifData, err := exif.Decode(file)
-	if err != nil {
-		return fmt.Errorf("error decoding EXIF: %v", err)
-	}
+	defer image.Close()
 
 	// Set the EXIF DateTimeOriginal
-	err = exifData.Set(exif.DateTimeOriginal, dateTime)
-	if err != nil {
-		return fmt.Errorf("error setting EXIF date: %v", err)
+	if err := image.SetExif("Exif.Image.DateTimeOriginal", dateTime); err != nil {
+		return fmt.Errorf("error setting EXIF DateTimeOriginal: %v", err)
 	}
 
-	// Save the updated EXIF data
-	// Note: Saving EXIF data back to a JPEG file in Go may require using an additional library
-	// or rewriting the JPEG with updated EXIF headers.
-	// This is a simplified placeholder.
-	return nil
+	return image.Write()
+}
+
+// Get EXIF DateTimeOriginal
+func getExifDateTaken(filePath string) (string, error) {
+	image, err := goexiv.Open(filePath)
+	if err != nil {
+		return "", fmt.Errorf("error opening image: %v", err)
+	}
+	defer image.Close()
+
+	// Get DateTimeOriginal
+	val, err := image.GetExif("Exif.Image.DateTimeOriginal")
+	if err != nil {
+		return "", nil
+	}
+
+	return val, nil
 }
 
 // Process Image Files
@@ -71,7 +74,6 @@ func processImage(file, folderPath string) error {
 	ext := strings.ToLower(filepath.Ext(file))
 	filePath := filepath.Join(folderPath, file)
 
-	// Check for EXIF data
 	exifDate, err := getExifDateTaken(filePath)
 	if err == nil && exifDate != "" {
 		fmt.Printf("Skipping already named image: %s\n", file)
@@ -105,7 +107,6 @@ func processImage(file, folderPath string) error {
 	newFilePath := filepath.Join(folderPath, newFileName+ext)
 	dateTime := fmt.Sprintf("%04d:%02d:%02d %02s:%02s:%02s", year, month, day, hour, minute, second)
 
-	// Set EXIF DateTaken and rename the file
 	if err := setExifDateTaken(filePath, dateTime); err != nil {
 		return err
 	}
@@ -117,70 +118,6 @@ func processImage(file, folderPath string) error {
 	return nil
 }
 
-// Process Video Files
-func processVideo(file, folderPath string) error {
-	ext := strings.ToLower(filepath.Ext(file))
-	filePath := filepath.Join(folderPath, file)
-
-	match := dateRegex.FindStringSubmatch(file)
-
-	var parsedDate time.Time
-	if match != nil {
-		year, _ := strconv.Atoi(match[1])
-		month, _ := strconv.Atoi(match[2])
-		day, _ := strconv.Atoi(match[3])
-		hour := matchOrDefault(match[4], "14")
-		minute := matchOrDefault(match[5], "00")
-		second := matchOrDefault(match[6], "00")
-
-		if isValidDate(year, month, day) {
-			parsedDate = time.Date(year, time.Month(month), day, atoi(hour), atoi(minute), atoi(second), 0, time.UTC)
-		} else {
-			fmt.Printf("Invalid date in filename: %s. Using file's modified date.\n", file)
-			fileInfo, err := os.Stat(filePath)
-			if err != nil {
-				return err
-			}
-			parsedDate = fileInfo.ModTime()
-		}
-	} else {
-		fileInfo, err := os.Stat(filePath)
-		if err != nil {
-			return err
-		}
-		parsedDate = fileInfo.ModTime()
-		fmt.Printf("Using file's modified date for video: %s\n", file)
-	}
-
-	year := parsedDate.Year()
-	month := fmt.Sprintf("%02d", parsedDate.Month())
-	day := fmt.Sprintf("%02d", parsedDate.Day())
-	hour := fmt.Sprintf("%02d", parsedDate.Hour())
-	minute := fmt.Sprintf("%02d", parsedDate.Minute())
-	second := fmt.Sprintf("%02d", parsedDate.Second())
-
-	baseName := fmt.Sprintf("%d-%s-%s %s.%s.%s", year, month, day, hour, minute, second)
-	newFileName, err := generateUniqueFileName(folderPath, baseName, ext)
-	if err != nil {
-		return err
-	}
-
-	newFilePath := filepath.Join(folderPath, newFileName+ext)
-	if err := os.Rename(filePath, newFilePath); err != nil {
-		return err
-	}
-
-	fmt.Printf("Renamed video: %s -> %s\n", file, newFileName+ext)
-	return nil
-}
-
-// Get EXIF DateTimeOriginal (for illustration, actual implementation depends on the library you use)
-func getExifDateTaken(filePath string) (string, error) {
-	// Implement EXIF extraction logic based on Go's EXIF library of your choice.
-	// Returning an empty string for the sake of the example.
-	return "", nil
-}
-
 // Match or provide a default value
 func matchOrDefault(value string, defaultValue string) string {
 	if value == "" {
@@ -189,15 +126,9 @@ func matchOrDefault(value string, defaultValue string) string {
 	return value
 }
 
-// atoi is a simple helper to convert a string to an int
-func atoi(str string) int {
-	result, _ := strconv.Atoi(str)
-	return result
-}
-
-// Process files in directory
+// Process all files in a directory
 func processFiles(folderPath string) error {
-	files, err := ioutil.ReadDir(folderPath)
+	files, err := os.ReadDir(folderPath)
 	if err != nil {
 		return fmt.Errorf("error reading directory: %v", err)
 	}
@@ -219,6 +150,45 @@ func processFiles(folderPath string) error {
 	return nil
 }
 
+
+func processVideo(file, folderPath string) error {
+	// try to parse the name of the file
+	match := dateRegex.FindStringSubmatch(file)
+	if match == nil {
+		fmt.Printf("No date in filename: %s\n", file)
+		return nil
+	} else {
+		// use modified date of the file to set the name of the file
+		filePath := filepath.Join(folderPath, file)
+		fileInfo, err := os.Stat(filePath)
+		if err != nil {
+			return err
+		}
+		year := fileInfo.ModTime().Year()
+		month := int(fileInfo.ModTime().Month())
+		day := fileInfo.ModTime().Day()
+		hour := fileInfo.ModTime().Hour()
+		minute := fileInfo.ModTime().Minute()
+		second := fileInfo.ModTime().Second()
+
+		baseName := fmt.Sprintf("%04d-%02d-%02d %02d.%02d.%02d", year, month, day, hour, minute, second)
+		newFileName, err := generateUniqueFileName(folderPath, baseName, filepath.Ext(file))
+		if err != nil {
+			return err
+		}
+
+		newFilePath := filepath.Join(folderPath, newFileName+filepath.Ext(file))
+		if err := os.Rename(filePath, newFilePath); err != nil {
+			return err
+		}
+
+	}
+
+	
+
+
+
+
 // Helper function to check if a slice contains a string
 func contains(slice []string, item string) bool {
 	for _, value := range slice {
@@ -237,5 +207,3 @@ func main() {
 	}
 	fmt.Println("Processing complete.")
 }
-
-
