@@ -1,21 +1,36 @@
 package main
 
 import (
+	"crypto/md5"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/bibauporto/photosOrganizer/helpers"
 	"github.com/bibauporto/photosOrganizer/processors"
+	"github.com/schollz/progressbar/v3"
 )
 
-// Process all folders and files recursively
+// Process all folders and files recursively with progress
 func processFiles(folderPath string) error {
 	files, err := os.ReadDir(folderPath)
 	if err != nil {
 		return fmt.Errorf("error reading directory %s: %w", folderPath, err)
 	}
+
+	// Calculate total files to process for the progress bar
+	var totalFiles int
+	filepath.Walk(folderPath, func(path string, info os.FileInfo, err error) error {
+		if err == nil && !info.IsDir() {
+			totalFiles++
+		}
+		return nil
+	})
+
+	// Initialize progress bar
+	bar := progressbar.New(totalFiles)
 
 	for _, file := range files {
 		filePath := filepath.Join(folderPath, file.Name())
@@ -40,16 +55,92 @@ func processFiles(folderPath string) error {
 			default:
 				fmt.Printf("Skipping unsupported file type: %s\n", file.Name())
 			}
+			// Update progress bar
+			bar.Add(1)
 		}
 	}
 	return nil
 }
 
+// Delete duplicate files based on MD5 hash with progress
+func deleteDuplicates(folderPath string) error {
+	hashes := make(map[string]string)
+	var totalFiles int
+
+	// Count total files to process for the progress bar
+	filepath.Walk(folderPath, func(path string, info os.FileInfo, err error) error {
+		if err == nil && !info.IsDir() {
+			totalFiles++
+		}
+		return nil
+	})
+
+	// Initialize progress bar
+	bar := progressbar.New(totalFiles)
+
+	err := filepath.Walk(folderPath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			return nil
+		}
+
+		file, err := os.Open(path)
+		if err != nil {
+			return err
+		}
+		defer file.Close()
+
+		hash := md5.New()
+		if _, err := io.Copy(hash, file); err != nil {
+			return err
+		}
+		hashStr := fmt.Sprintf("%x", hash.Sum(nil))
+
+		if existingPath, found := hashes[hashStr]; found {
+			fmt.Printf("Duplicate found: %s and %s\n", existingPath, path)
+			if err := os.Remove(path); err != nil {
+				return err
+			}
+		} else {
+			hashes[hashStr] = path
+		}
+		// Update progress bar
+		bar.Add(1)
+		return nil
+	})
+	return err
+}
+
 func main() {
-	folderPath, _ := os.Getwd() 
-	fmt.Println("Starting processing...")
-	if err := processFiles(folderPath); err != nil {
-		fmt.Printf("Error: %v\n", err)
+	var choice int
+	fmt.Println("Select an option:")
+	fmt.Println("1. Parse and rename photos and videos")
+	fmt.Println("2. Delete duplicates")
+	fmt.Println("3. Exit")
+	fmt.Scan(&choice)
+
+	folderPath, _ := os.Getwd()
+
+	switch choice {
+	case 1:
+		fmt.Println("Starting processing...")
+		if err := processFiles(folderPath); err != nil {
+			fmt.Printf("Error: %v\n", err)
+		}
+		fmt.Println("Processing complete.")
+	case 2:
+		fmt.Println("Deleting duplicates...")
+		if err := deleteDuplicates(folderPath); err != nil {
+			fmt.Printf("Error: %v\n", err)
+		}
+		fmt.Println("Duplicate deletion complete.")
+	case 3:
+		fmt.Println("Exiting program.")
+		os.Exit(0)
+	default:
+		fmt.Println("Invalid option. Exiting program.")
+		os.Exit(1)
 	}
-	fmt.Println("Processing complete.")
 }
