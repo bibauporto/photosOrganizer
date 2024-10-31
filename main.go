@@ -114,6 +114,7 @@ func deleteDuplicates(folderPath string) error {
 }
 
 func main() {
+	for  {
 	var choice int
 	fmt.Println("Select an option:")
 	fmt.Println("1. Parse and rename photos and videos")
@@ -142,5 +143,5 @@ func main() {
 	default:
 		fmt.Println("Invalid option. Exiting program.")
 		os.Exit(1)
-	}
+	}}
 }
