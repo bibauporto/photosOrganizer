@@ -53,7 +53,7 @@ func processFiles(folderPath string) error {
 					return fmt.Errorf("error processing video %s: %w", file.Name(), err)
 				}
 			default:
-				fmt.Printf("Skipping unsupported file type: %s\n", file.Name())
+				// fmt.Printf("Skipping unsupported file type: %s\n", file.Name())
 			}
 			// Update progress bar
 			bar.Add(1)
@@ -100,8 +100,8 @@ err := filepath.Walk(folderPath, func(path string, info os.FileInfo, err error) 
 		}
 		hashStr := fmt.Sprintf("%x", hash.Sum(nil))
 
-		if existingPath, found := hashes[hashStr]; found {
-			fmt.Printf("Duplicate found: %s and %s\n", existingPath, path)
+		if _, found := hashes[hashStr]; found {
+			// fmt.Printf("Duplicate found: %s and %s\n", existingPath, path)
 			if err := os.Remove(path); err != nil {
 				return fmt.Errorf("failed to delete file %s: %w", path, err)
 			}
@@ -149,5 +149,8 @@ func main() {
 	default:
 		fmt.Println("Invalid option. Exiting program.")
 		os.Exit(1)
-	}}
+	}
+
+	fmt.Println("---------------------------------")
+}
 }

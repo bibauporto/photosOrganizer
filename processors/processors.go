@@ -17,7 +17,6 @@ func ProcessImage(file, folderPath string) error {
 
 	// Skip renaming if the file is already named correctly
 	if helpers.CorrectNameRegex.MatchString(file) {
-		fmt.Printf("Skipping already named image: %s\n", file)
 		return nil
 	}
 
@@ -65,7 +64,6 @@ func tryRenameByFilename(file, folderPath, filePath string) error {
 	// Parse date from the filename
 	parsedDate, err := parseDateFromFilename(file)
 	if err != nil {
-		fmt.Printf("No date in filename: %s\n", file)
 		return nil
 	}
 
@@ -92,7 +90,6 @@ func updateModifiedDateIfNeeded(filePath string, parsedDate time.Time) error {
 		if err := os.Chtimes(filePath, modTime, parsedDate); err != nil {
 			return fmt.Errorf("error setting modified date: %w", err)
 		}
-		fmt.Printf("Updated modified date for %s to %s\n", filePath, parsedDate)
 	}
 	return nil
 }
@@ -110,7 +107,6 @@ func renameFile(filePath, folderPath, baseName string) error {
 		return fmt.Errorf("error renaming file: %w", err)
 	}
 
-	fmt.Printf("Renamed file: %s -> %s\n", filepath.Base(filePath), newFileName+ext)
 	return nil
 }
 
