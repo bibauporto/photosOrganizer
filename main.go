@@ -78,14 +78,16 @@ func deleteDuplicates(folderPath string) error {
 	// Initialize progress bar
 	bar := progressbar.New(totalFiles)
 
-	err := filepath.Walk(folderPath, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		if info.IsDir() {
-			return nil
-		}
+err := filepath.Walk(folderPath, func(path string, info os.FileInfo, err error) error {
+	if err != nil {
+		return err
+	}
+	if info.IsDir() {
+		return nil
+	}
 
+	// Open the file within a limited scope
+	func() error {
 		file, err := os.Open(path)
 		if err != nil {
 			return err
@@ -101,15 +103,19 @@ func deleteDuplicates(folderPath string) error {
 		if existingPath, found := hashes[hashStr]; found {
 			fmt.Printf("Duplicate found: %s and %s\n", existingPath, path)
 			if err := os.Remove(path); err != nil {
-				return err
+				return fmt.Errorf("failed to delete file %s: %w", path, err)
 			}
 		} else {
 			hashes[hashStr] = path
 		}
-		// Update progress bar
-		bar.Add(1)
 		return nil
-	})
+	}()
+
+	// Update progress bar
+	bar.Add(1)
+	return nil
+})
+
 	return err
 }
 
