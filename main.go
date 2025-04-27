@@ -128,7 +128,13 @@ func main() {
 	fmt.Println("3. Exit")
 	fmt.Scan(&choice)
 
-	folderPath, _ := os.Getwd()
+	folderPath, err := os.Getwd()
+
+	if err != nil {
+		fmt.Printf("Error getting current directory: %v\n", err)
+		os.Exit(1)
+	}
+
 
 	switch choice {
 	case 1:
